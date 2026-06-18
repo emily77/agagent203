@@ -9,8 +9,8 @@ import zipfile
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-BUNDLE_URL = "https://tmpfiles.org/dl/wDwZLjNEF5ON/japan-life-language-school-os.clean.zip"
-BUNDLE_SHA256 = "b64765b4955cc49db52d2fff32b5ab1c7db9a72a6a083815f275e9a27e1d6fff"
+BUNDLE_URL = "https://tmpfiles.org/dl/wxwnLYNkN5jT/japan-life-language-school-os.v2.zip"
+BUNDLE_SHA256 = "4816678294fa18485863dc9563cd5bb9fffc540997480016274a01f7322c66d6"
 BUNDLE_CACHE_DIR = BASE_DIR / "_bundle_cache"
 BUNDLE_ARCHIVE_PATH = BUNDLE_CACHE_DIR / "school-platform.zip"
 BUNDLE_DIR = BASE_DIR / "_bundle_src"
