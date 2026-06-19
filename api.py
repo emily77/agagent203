@@ -1,28 +1,22 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import shutil
 import sys
-import urllib.request
-import zipfile
+import tarfile
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-BUNDLE_URL = "https://tmpfiles.org/dl/wxwnLYNkN5jT/japan-life-language-school-os.v2.zip"
-BUNDLE_SHA256 = "4816678294fa18485863dc9563cd5bb9fffc540997480016274a01f7322c66d6"
+BUNDLE_PARTS_DIR = BASE_DIR / "bundles"
+BUNDLE_PART_GLOB = "jls-render-source.part*.b64"
+BUNDLE_SHA256 = "9b79bac5d58bc1b79b272a9825f76158ae7f5c523471af3f414266360b9d00b7"
 BUNDLE_CACHE_DIR = BASE_DIR / "_bundle_cache"
-BUNDLE_ARCHIVE_PATH = BUNDLE_CACHE_DIR / "school-platform.zip"
+BUNDLE_ARCHIVE_PATH = BUNDLE_CACHE_DIR / "school-platform.tar.xz"
 BUNDLE_DIR = BASE_DIR / "_bundle_src"
 BUNDLE_MARKER_PATH = BUNDLE_DIR / ".bundle_sha256"
 APP_MODULE_PATH = BUNDLE_DIR / "api.py"
-
-
-def _download_bundle() -> None:
-    BUNDLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    request = urllib.request.Request(BUNDLE_URL, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(request, timeout=300) as response, BUNDLE_ARCHIVE_PATH.open("wb") as target:
-        shutil.copyfileobj(response, target)
 
 
 def _sha256(path: Path) -> str:
@@ -33,13 +27,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _materialize_archive() -> None:
+    BUNDLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    parts = sorted(BUNDLE_PARTS_DIR.glob(BUNDLE_PART_GLOB))
+    if not parts:
+        raise RuntimeError(f"No bundle parts found in {BUNDLE_PARTS_DIR}")
+    encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
+    BUNDLE_ARCHIVE_PATH.write_bytes(base64.b64decode(encoded))
+
+
 def _ensure_bundle() -> None:
     if APP_MODULE_PATH.exists() and BUNDLE_MARKER_PATH.exists() and BUNDLE_MARKER_PATH.read_text(encoding="utf-8").strip() == BUNDLE_SHA256:
         if str(BUNDLE_DIR) not in sys.path:
             sys.path.insert(0, str(BUNDLE_DIR))
         return
 
-    _download_bundle()
+    _materialize_archive()
     actual_sha = _sha256(BUNDLE_ARCHIVE_PATH)
     if actual_sha != BUNDLE_SHA256:
         raise RuntimeError(f"Bundle SHA mismatch: expected {BUNDLE_SHA256}, got {actual_sha}")
@@ -47,7 +50,7 @@ def _ensure_bundle() -> None:
     if BUNDLE_DIR.exists():
         shutil.rmtree(BUNDLE_DIR)
     BUNDLE_DIR.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(BUNDLE_ARCHIVE_PATH) as archive:
+    with tarfile.open(BUNDLE_ARCHIVE_PATH, mode="r:xz") as archive:
         archive.extractall(BUNDLE_DIR)
     BUNDLE_MARKER_PATH.write_text(BUNDLE_SHA256, encoding="utf-8")
 
