@@ -8,6 +8,8 @@ import sys
 import tarfile
 from pathlib import Path
 
+from fastapi import Request
+
 BASE_DIR = Path(__file__).resolve().parent
 BUNDLE_PARTS_DIR = BASE_DIR / "bundles"
 BUNDLE_PART_GLOB = "jls-render-source.part*.b64"
@@ -70,3 +72,13 @@ def _load_app():
 
 
 app = _load_app()
+
+
+@app.middleware("http")
+async def ensure_utf8_json_responses(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/school-platform/api"):
+        content_type = response.headers.get("content-type", "")
+        if content_type.lower().startswith("application/json") and "charset=" not in content_type.lower():
+            response.headers["content-type"] = "application/json; charset=utf-8"
+    return response
