@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import importlib.util
 import shutil
 import sys
 import tarfile
 from pathlib import Path
+from urllib.request import Request as UrlRequest, urlopen
 
 from fastapi import Request
 
 BASE_DIR = Path(__file__).resolve().parent
-BUNDLE_PARTS_DIR = BASE_DIR / "bundles"
-BUNDLE_PART_GLOB = "jls-render-source.part*.b64"
-BUNDLE_SHA256 = "9b79bac5d58bc1b79b272a9825f76158ae7f5c523471af3f414266360b9d00b7"
+BUNDLE_URL = "https://raw.githubusercontent.com/809540023-lgtm/p1/main/school-platform.tar.xz"
+BUNDLE_SHA256 = "2919d799f2dc1dcb8fc43f586955a6ac9b9cbd810b4f53370ba6c94092b91817"
 BUNDLE_CACHE_DIR = BASE_DIR / "_bundle_cache"
 BUNDLE_ARCHIVE_PATH = BUNDLE_CACHE_DIR / "school-platform.tar.xz"
 BUNDLE_DIR = BASE_DIR / "_bundle_src"
@@ -29,13 +28,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _materialize_archive() -> None:
+def _download_archive() -> None:
     BUNDLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    parts = sorted(BUNDLE_PARTS_DIR.glob(BUNDLE_PART_GLOB))
-    if not parts:
-        raise RuntimeError(f"No bundle parts found in {BUNDLE_PARTS_DIR}")
-    encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
-    BUNDLE_ARCHIVE_PATH.write_bytes(base64.b64decode(encoded))
+    request = UrlRequest(BUNDLE_URL, headers={"User-Agent": "school-platform-bootstrap"})
+    with urlopen(request, timeout=300) as response, BUNDLE_ARCHIVE_PATH.open("wb") as target:
+        shutil.copyfileobj(response, target)
 
 
 def _ensure_bundle() -> None:
@@ -44,7 +41,7 @@ def _ensure_bundle() -> None:
             sys.path.insert(0, str(BUNDLE_DIR))
         return
 
-    _materialize_archive()
+    _download_archive()
     actual_sha = _sha256(BUNDLE_ARCHIVE_PATH)
     if actual_sha != BUNDLE_SHA256:
         raise RuntimeError(f"Bundle SHA mismatch: expected {BUNDLE_SHA256}, got {actual_sha}")
